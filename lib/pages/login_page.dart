@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:notes_day/provider/auth_provider.dart';
 import 'home_page.dart';
 import 'register_page.dart';
 
@@ -13,16 +15,36 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   bool isLoading = false;
+  bool _obscurePassword = true;
 
-  void _login() {
+  void _login() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Email dan Password tidak boleh kosong!")),
+      );
+      return;
+    }
+
     setState(() => isLoading = true);
-    Future.delayed(Duration(seconds: 2), () {
-      setState(() => isLoading = false);
+
+    String? errorMessage = await authProvider.login(email, password);
+
+    setState(() => isLoading = false);
+
+    if (errorMessage != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(errorMessage)));
+    } else {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => HomePage()),
       );
-    });
+    }
   }
 
   @override
@@ -30,7 +52,6 @@ class _LoginPageState extends State<LoginPage> {
     return Scaffold(
       body: Stack(
         children: [
-          // Background Gradient
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -43,12 +64,10 @@ class _LoginPageState extends State<LoginPage> {
           Column(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Logo di Atas
               Padding(
                 padding: const EdgeInsets.only(top: 80),
                 child: Icon(Icons.person, size: 100, color: Colors.white),
               ),
-              // Form Login di Bawah
               Expanded(
                 child: Container(
                   padding: EdgeInsets.all(20),
@@ -82,10 +101,22 @@ class _LoginPageState extends State<LoginPage> {
                       SizedBox(height: 15),
                       TextField(
                         controller: passwordController,
-                        obscureText: true,
+                        obscureText: _obscurePassword,
                         decoration: InputDecoration(
                           labelText: "Password",
                           prefixIcon: Icon(Icons.lock),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              });
+                            },
+                          ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),

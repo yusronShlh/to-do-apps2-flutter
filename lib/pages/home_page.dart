@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
 import 'login_page.dart';
+import 'add_note_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -10,10 +12,54 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  List<String> notes = [];
+
   @override
   void initState() {
     super.initState();
+    _loadNotes();
     _showWelcomeDialog();
+  }
+
+  Future<void> _loadNotes() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      notes = prefs.getStringList('notes') ?? [];
+    });
+  }
+
+  Future<void> _addNote(String note) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    notes.add(note);
+    await prefs.setStringList('notes', notes);
+    setState(() {});
+  }
+
+  Future<void> _editNote(int index, String newNote) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    notes[index] = newNote;
+    await prefs.setStringList('notes', notes);
+    setState(() {});
+  }
+
+  Future<void> _deleteNote(int index) async {
+    AwesomeDialog(
+      context: context,
+      dialogType: DialogType.warning,
+      animType: AnimType.bottomSlide,
+      title: "Konfirmasi Hapus",
+      desc: "Apakah Anda yakin ingin menghapus catatan ini?",
+      btnCancelOnPress: () {},
+      btnCancelText: "Batal",
+      btnOkOnPress: () async {
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        notes.removeAt(index);
+        await prefs.setStringList('notes', notes);
+        setState(() {});
+      },
+      btnOkText: "Hapus",
+      btnOkColor: Colors.red,
+    ).show();
   }
 
   void _showWelcomeDialog() {
@@ -52,6 +98,37 @@ class _HomePageState extends State<HomePage> {
     ).show();
   }
 
+  void _showEditDialog(int index) {
+    TextEditingController controller = TextEditingController(
+      text: notes[index],
+    );
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("Edit Catatan"),
+          content: TextField(
+            controller: controller,
+            decoration: InputDecoration(hintText: "Masukkan catatan baru"),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text("Batal"),
+            ),
+            TextButton(
+              onPressed: () {
+                _editNote(index, controller.text);
+                Navigator.pop(context);
+              },
+              child: Text("Simpan"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -61,52 +138,53 @@ class _HomePageState extends State<HomePage> {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
+        backgroundColor: Colors.blue.shade300,
         actions: [
           IconButton(
             icon: Icon(Icons.logout, color: Colors.redAccent),
             onPressed: _confirmLogout,
           ),
         ],
-        backgroundColor: Colors.blue.shade300,
-        elevation: 4, // Memberikan efek bayangan
       ),
-      body: Center(
-        child: Card(
-          elevation: 6, // Memberikan efek bayangan pada kartu
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          margin: EdgeInsets.all(20),
-          child: Padding(
-            padding: EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.task_alt, size: 80, color: Colors.blue.shade300),
-                SizedBox(height: 16),
-                Text(
-                  "Atur tugas-tugasmu dengan mudah dan tetap produktif!",
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () {
-                    // Nanti bisa diarahkan ke halaman daftar tugas
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue.shade300,
-                    padding: EdgeInsets.symmetric(horizontal: 30, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+      body:
+          notes.isEmpty
+              ? Center(child: Text("Belum ada catatan, tambahkan sekarang!"))
+              : ListView.builder(
+                itemCount: notes.length,
+                itemBuilder: (context, index) {
+                  return Card(
+                    margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: ListTile(
+                      title: Text(notes[index]),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: Icon(Icons.edit, color: Colors.blue),
+                            onPressed: () => _showEditDialog(index),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.delete, color: Colors.red),
+                            onPressed: () => _deleteNote(index),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  child: Text("Mulai", style: TextStyle(fontSize: 16)),
-                ),
-              ],
-            ),
-          ),
-        ),
+                  );
+                },
+              ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          final newNote = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => AddNotePage()),
+          );
+          if (newNote != null) {
+            _addNote(newNote);
+          }
+        },
+        child: Icon(Icons.add),
+        backgroundColor: Colors.blue.shade300,
       ),
     );
   }

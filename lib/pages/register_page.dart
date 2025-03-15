@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../provider/auth_provider.dart';
 import 'login_page.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -12,13 +14,28 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   bool isLoading = false;
+  bool isPasswordVisible = false;
 
-  void _register() {
+  void _register() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
     setState(() => isLoading = true);
-    Future.delayed(Duration(seconds: 2), () {
-      setState(() => isLoading = false);
-      Navigator.pop(context);
-    });
+
+    try {
+      await authProvider.register(
+        emailController.text.trim(),
+        passwordController.text.trim(),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Registrasi berhasil, silakan login!")),
+      );
+      Navigator.pop(context); // Kembali ke LoginPage
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+
+    setState(() => isLoading = false);
   }
 
   @override
@@ -78,10 +95,22 @@ class _RegisterPageState extends State<RegisterPage> {
                       SizedBox(height: 15),
                       TextField(
                         controller: passwordController,
-                        obscureText: true,
+                        obscureText: !isPasswordVisible,
                         decoration: InputDecoration(
                           labelText: "Password",
                           prefixIcon: Icon(Icons.lock),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              isPasswordVisible
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                isPasswordVisible = !isPasswordVisible;
+                              });
+                            },
+                          ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
