@@ -47,6 +47,23 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  void _loginWithGoogle() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    String? errorMessage = await authProvider.signInWithGoogle();
+
+    if (errorMessage != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(errorMessage)));
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HomePage()),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -146,6 +163,30 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             ),
                           ),
+                      SizedBox(height: 10),
+                      ElevatedButton.icon(
+                        onPressed: _loginWithGoogle,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(color: Colors.grey),
+                          ),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 10,
+                          ),
+                        ),
+                        icon: Image.asset(
+                          'assets/images/google_logo.png',
+                          height: 24,
+                        ),
+                        label: Text(
+                          "Login dengan Google",
+                          style: TextStyle(fontSize: 16),
+                        ),
+                      ),
                       SizedBox(height: 10),
                       TextButton(
                         onPressed:

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../provider/auth_provider.dart';
+import 'package:notes_day/provider/auth_provider.dart';
+import 'home_page.dart';
 import 'login_page.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -14,28 +15,81 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   bool isLoading = false;
-  bool isPasswordVisible = false;
+  bool _obscurePassword = true;
+
+  bool _isValidEmail(String email) {
+    return RegExp(
+      r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$",
+    ).hasMatch(email);
+  }
 
   void _register() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    setState(() => isLoading = true);
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
 
-    try {
-      await authProvider.register(
-        emailController.text.trim(),
-        passwordController.text.trim(),
-      );
+    if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Registrasi berhasil, silakan login!")),
+        SnackBar(content: Text("Email dan Password tidak boleh kosong!")),
       );
-      Navigator.pop(context); // Kembali ke LoginPage
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      return;
     }
 
+    if (!_isValidEmail(email)) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Format email tidak valid!")));
+      return;
+    }
+
+    setState(() => isLoading = true);
+
+    String? errorMessage = await authProvider.register(email, password);
+
     setState(() => isLoading = false);
+
+    if (errorMessage != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(errorMessage)));
+    } else {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomePage()),
+        );
+      }
+    }
+  }
+
+  void _registerWithGoogle() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    setState(() => isLoading = true);
+    String? errorMessage = await authProvider.registerWithGoogle();
+    setState(() => isLoading = false);
+
+    if (errorMessage != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(errorMessage)));
+
+      if (errorMessage == 'Akun ini sudah terdaftar. Silakan login.') {
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => LoginPage()),
+          );
+        }
+      }
+    } else {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomePage()),
+        );
+      }
+    }
   }
 
   @override
@@ -43,11 +97,10 @@ class _RegisterPageState extends State<RegisterPage> {
     return Scaffold(
       body: Stack(
         children: [
-          // Background Gradient
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [Colors.green.shade300, Colors.green.shade700],
+                colors: [Colors.blue.shade300, Colors.blue.shade700],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
@@ -56,12 +109,10 @@ class _RegisterPageState extends State<RegisterPage> {
           Column(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Logo di Atas
               Padding(
                 padding: const EdgeInsets.only(top: 80),
                 child: Icon(Icons.person_add, size: 100, color: Colors.white),
               ),
-              // Form Register di Bawah
               Expanded(
                 child: Container(
                   padding: EdgeInsets.all(20),
@@ -95,19 +146,19 @@ class _RegisterPageState extends State<RegisterPage> {
                       SizedBox(height: 15),
                       TextField(
                         controller: passwordController,
-                        obscureText: !isPasswordVisible,
+                        obscureText: _obscurePassword,
                         decoration: InputDecoration(
                           labelText: "Password",
                           prefixIcon: Icon(Icons.lock),
                           suffixIcon: IconButton(
                             icon: Icon(
-                              isPasswordVisible
-                                  ? Icons.visibility
-                                  : Icons.visibility_off,
+                              _obscurePassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
                             ),
                             onPressed: () {
                               setState(() {
-                                isPasswordVisible = !isPasswordVisible;
+                                _obscurePassword = !_obscurePassword;
                               });
                             },
                           ),
@@ -122,7 +173,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           : ElevatedButton(
                             onPressed: _register,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green.shade700,
+                              backgroundColor: Colors.blue.shade700,
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -133,7 +184,7 @@ class _RegisterPageState extends State<RegisterPage> {
                               ),
                             ),
                             child: Text(
-                              "Register",
+                              "Daftar",
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -141,12 +192,43 @@ class _RegisterPageState extends State<RegisterPage> {
                             ),
                           ),
                       SizedBox(height: 10),
+                      ElevatedButton.icon(
+                        onPressed: _registerWithGoogle,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(color: Colors.grey),
+                          ),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 10,
+                          ),
+                        ),
+                        icon: Image.asset(
+                          'assets/images/google_logo.png',
+                          height: 24,
+                        ),
+                        label: Text(
+                          "Daftar dengan Google",
+                          style: TextStyle(fontSize: 16),
+                        ),
+                      ),
+                      SizedBox(height: 10),
                       TextButton(
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => LoginPage(),
+                            ),
+                          );
+                        },
                         child: Text(
                           "Sudah punya akun? Login",
                           style: TextStyle(
-                            color: Colors.green.shade700,
+                            color: Colors.blue.shade700,
                             fontSize: 14,
                           ),
                         ),
