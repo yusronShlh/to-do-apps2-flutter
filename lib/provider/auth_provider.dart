@@ -59,6 +59,7 @@ class AuthProvider extends ChangeNotifier {
       );
 
       // Cek apakah email sudah terdaftar di Firebase
+      // ignore: deprecated_member_use
       final List<String> signInMethods = await _auth.fetchSignInMethodsForEmail(
         googleUser.email,
       );

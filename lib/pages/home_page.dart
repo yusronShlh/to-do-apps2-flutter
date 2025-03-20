@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
-import 'login_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'add_note_page.dart';
+import 'login_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -12,71 +13,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  List<String> notes = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadNotes();
-    _showWelcomeDialog();
-  }
-
-  Future<void> _loadNotes() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState(() {
-      notes = prefs.getStringList('notes') ?? [];
-    });
-  }
-
-  Future<void> _addNote(String note) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    notes.add(note);
-    await prefs.setStringList('notes', notes);
-    setState(() {});
-  }
-
-  Future<void> _editNote(int index, String newNote) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    notes[index] = newNote;
-    await prefs.setStringList('notes', notes);
-    setState(() {});
-  }
-
-  Future<void> _deleteNote(int index) async {
-    AwesomeDialog(
-      context: context,
-      dialogType: DialogType.warning,
-      animType: AnimType.bottomSlide,
-      title: "Konfirmasi Hapus",
-      desc: "Apakah Anda yakin ingin menghapus catatan ini?",
-      btnCancelOnPress: () {},
-      btnCancelText: "Batal",
-      btnOkOnPress: () async {
-        SharedPreferences prefs = await SharedPreferences.getInstance();
-        notes.removeAt(index);
-        await prefs.setStringList('notes', notes);
-        setState(() {});
-      },
-      btnOkText: "Hapus",
-      btnOkColor: Colors.red,
-    ).show();
-  }
-
-  void _showWelcomeDialog() {
-    Future.delayed(Duration(milliseconds: 500), () {
-      if (mounted) {
-        AwesomeDialog(
-          context: context,
-          dialogType: DialogType.info,
-          animType: AnimType.bottomSlide,
-          title: "Selamat Datang!",
-          desc: "Atur tugas-tugasmu dengan mudah dan tetap produktif!",
-          btnOkOnPress: () {},
-          btnOkText: "Mulai",
-        ).show();
-      }
-    });
-  }
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   void _confirmLogout() {
     AwesomeDialog(
@@ -87,46 +25,40 @@ class _HomePageState extends State<HomePage> {
       desc: "Apakah Anda yakin ingin logout?",
       btnCancelOnPress: () {},
       btnCancelText: "Tidak",
-      btnOkOnPress: () {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => LoginPage()),
-        );
+      btnOkOnPress: () async {
+        await _auth.signOut();
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => LoginPage()),
+          );
+        }
       },
       btnOkText: "Ya, Logout",
       btnOkColor: Colors.red,
     ).show();
   }
 
-  void _showEditDialog(int index) {
-    TextEditingController controller = TextEditingController(
-      text: notes[index],
-    );
-    showDialog(
+  void _deleteNote(String docId) {
+    AwesomeDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text("Edit Catatan"),
-          content: TextField(
-            controller: controller,
-            decoration: InputDecoration(hintText: "Masukkan catatan baru"),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text("Batal"),
-            ),
-            TextButton(
-              onPressed: () {
-                _editNote(index, controller.text);
-                Navigator.pop(context);
-              },
-              child: Text("Simpan"),
-            ),
-          ],
-        );
+      dialogType: DialogType.warning,
+      animType: AnimType.bottomSlide,
+      title: "Konfirmasi Hapus",
+      desc: "Apakah Anda yakin ingin menghapus catatan ini?",
+      btnCancelOnPress: () {},
+      btnCancelText: "Batal",
+      btnOkOnPress: () async {
+        await _firestore
+            .collection('users')
+            .doc(_auth.currentUser!.uid)
+            .collection('notes')
+            .doc(docId)
+            .delete();
       },
-    );
+      btnOkText: "Hapus",
+      btnOkColor: Colors.red,
+    ).show();
   }
 
   @override
@@ -134,7 +66,7 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          "Catatan harian",
+          "Catatan Harian",
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
@@ -146,45 +78,52 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      body:
-          notes.isEmpty
-              ? Center(child: Text("Belum ada catatan, tambahkan sekarang!"))
-              : ListView.builder(
-                itemCount: notes.length,
-                itemBuilder: (context, index) {
-                  return Card(
-                    margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: ListTile(
-                      title: Text(notes[index]),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: Icon(Icons.edit, color: Colors.blue),
-                            onPressed: () => _showEditDialog(index),
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.delete, color: Colors.red),
-                            onPressed: () => _deleteNote(index),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
+      body: StreamBuilder(
+        stream:
+            _firestore
+                .collection('users')
+                .doc(_auth.currentUser!.uid)
+                .collection('notes')
+                .orderBy('timestamp', descending: true)
+                .snapshots(),
+        builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          }
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return Center(
+              child: Text("Belum ada catatan, tambahkan sekarang!"),
+            );
+          }
+
+          return ListView.builder(
+            itemCount: snapshot.data!.docs.length,
+            itemBuilder: (context, index) {
+              var doc = snapshot.data!.docs[index];
+              return Card(
+                margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: ListTile(
+                  title: Text(doc['title']),
+                  subtitle: Text(doc['description']),
+                  trailing: IconButton(
+                    icon: Icon(Icons.delete, color: Colors.red),
+                    onPressed: () => _deleteNote(doc.id),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final newNote = await Navigator.push(
+        onPressed: () {
+          Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => AddNotePage()),
           );
-          if (newNote != null) {
-            _addNote(newNote);
-          }
         },
-        child: Icon(Icons.add),
         backgroundColor: Colors.blue.shade300,
+        child: Icon(Icons.add),
       ),
     );
   }

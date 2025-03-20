@@ -50,6 +50,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     if (errorMessage != null) {
       ScaffoldMessenger.of(
+        // ignore: use_build_context_synchronously
         context,
       ).showSnackBar(SnackBar(content: Text(errorMessage)));
     } else {
@@ -71,6 +72,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     if (errorMessage != null) {
       ScaffoldMessenger.of(
+        // ignore: use_build_context_synchronously
         context,
       ).showSnackBar(SnackBar(content: Text(errorMessage)));
 
